@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Brick Wall</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #000;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      touch-action: none;
+      font-family: 'Courier New', monospace;
+    }
+
+    canvas { display: block; }
+
+    #hud {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 18px 22px;
+    }
+
+    #user-count {
+      align-self: flex-end;
+      color: rgba(0, 220, 255, 0.55);
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    #hint {
+      align-self: center;
+      color: rgba(0, 220, 255, 0.3);
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      animation: fadehint 4s ease-in-out forwards;
+      animation-delay: 2s;
+      opacity: 1;
+    }
+
+    @keyframes fadehint {
+      0%   { opacity: 1; }
+      70%  { opacity: 0.3; }
+      100% { opacity: 0; }
+    }
+  </style>
+
+  <!-- Three.js module imports -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="hud">
+    <div id="user-count">● 1 online</div>
+    <div id="hint">tap a brick</div>
+  </div>
+
+  <!-- Socket.IO (served by Express) -->
+  <script src="/socket.io/socket.io.js"></script>
+  <!-- GSAP for animations -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.4/gsap.min.js"></script>
+  <!-- Main app (ES module) -->
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>
