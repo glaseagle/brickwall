@@ -39,7 +39,25 @@ Then open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Multiplayer on your local network
 
-Other devices on the same Wi-Fi can connect, but WSL2 requires a couple of extra steps on Windows.
+### Mac
+
+No extra setup needed. Just start the server and find your local IP:
+
+```bash
+ipconfig getifaddr en0
+```
+
+Other devices on the same Wi-Fi connect to `http://<YOUR_MAC_IP>:3000`.
+
+If that returns nothing (e.g. on ethernet), try `en1` instead.
+
+> macOS may show a firewall prompt the first time — click **Allow**.
+
+---
+
+### Windows (WSL2)
+
+WSL2 requires a couple of extra steps.
 
 ### 1. Find your WSL2 IP
 
