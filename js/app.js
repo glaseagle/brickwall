@@ -289,7 +289,7 @@ for (let row = 0; row < ROWS; row++) {
     const edges = new THREE.LineSegments(edgeGeo, edgeMat);
     mesh.add(edges);
 
-    bricks[id] = { id, mesh, x, y, fallen: false, animating: false };
+    bricks[id] = { id, mesh, x, y, fallen: false, animating: false, matType: _mt };
     brickMeshes.push(mesh);
   }
 }
@@ -359,8 +359,23 @@ socket.on('init-state', (state) => {
   }
 });
 
-socket.on('brick-fall',   (id) => { console.log('[recv] brick-fall', id);   const b = bricks[id]; if (b) fallBrick(b);   });
-socket.on('brick-return', (id) => { console.log('[recv] brick-return', id); const b = bricks[id]; if (b) returnBrick(b); });
+socket.on('group-fall', ({ brickIds }) => {
+  brickIds.forEach((id, i) => {
+    const b = bricks[id];
+    if (b) setTimeout(() => fallBrick(b), i === 0 ? 0 : Math.random() * 260);
+  });
+});
+
+socket.on('group-return', ({ brickIds, material }) => {
+  const pool = MAT_POOL[material] || MAT_POOL['brick'];
+  brickIds.forEach(id => {
+    const b = bricks[id];
+    if (!b) return;
+    b.mesh.material = pool[Math.floor(Math.random() * pool.length)];
+    b.matType = material;
+    returnBrick(b);
+  });
+});
 
 // ─────────────────────────────────────────────
 // INPUT — mouse & touch (uses canvas rect for letterbox-safe coords)
@@ -386,8 +401,8 @@ function onInteract(clientX, clientY) {
     const brick = bricks[id];
     console.log('[hit]', id, { fallen: brick?.fallen, animating: brick?.animating });
     if (brick && !brick.fallen && !brick.animating) {
-      socket.emit('brick-click', id);
-      console.log('[emit] brick-click', id);
+      socket.emit('brick-click', { brickId: id, material: brick.matType });
+      console.log('[emit] brick-click', id, brick.matType);
     }
   }
 }
