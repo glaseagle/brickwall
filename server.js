@@ -9,6 +9,10 @@ const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.get('/video/giant', (req, res) => {
+  res.sendFile(path.resolve('C:/Users/mcull/Downloads/Giant.mov'));
+});
+
 // Track brick state: brickId -> { fallen: bool, timer: Timeout | null }
 const brickState = {};
 let userCount = 0;
