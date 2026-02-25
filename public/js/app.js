@@ -1,7 +1,4 @@
 import * as THREE from 'three';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass }     from 'three/addons/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
 // ─────────────────────────────────────────────
 // SOCKET.IO
@@ -47,22 +44,6 @@ const scene = new THREE.Scene();
 
 const camera = new THREE.PerspectiveCamera(55, W / H, 0.1, 100);
 camera.position.set(0, 0, 7);
-
-// ─────────────────────────────────────────────
-// BLOOM POST-PROCESSING
-// threshold raised to 0.9 so video colours don't over-bloom;
-// HDR edge/glow colours (>1.0 luminance) still bloom hard
-// ─────────────────────────────────────────────
-const composer = new EffectComposer(renderer);
-composer.addPass(new RenderPass(scene, camera));
-
-const bloom = new UnrealBloomPass(
-  new THREE.Vector2(W, H),
-  1.35,  // strength
-  0.55,  // radius
-  0.9    // threshold
-);
-composer.addPass(bloom);
 
 // ─────────────────────────────────────────────
 // LIGHTS
@@ -123,7 +104,6 @@ scene.background = videoTex;
 // LAYER 3 (front): shared brick geometry & materials
 // ─────────────────────────────────────────────
 const brickGeo = new THREE.BoxGeometry(BW, BH, BD);
-const edgeGeo  = new THREE.EdgesGeometry(brickGeo);
 
 // ─────────────────────────────────────────────
 // PROCEDURAL CANVAS TEXTURES & MATERIALS
@@ -259,12 +239,6 @@ MAT_TYPES.forEach((type, ti) => {
   });
 });
 
-const edgeMat = new THREE.LineBasicMaterial({
-  color:       new THREE.Color(0.0, 2.8, 2.8),
-  transparent: true,
-  opacity:     0.85,
-});
-
 // ─────────────────────────────────────────────
 // BUILD BRICK GRID
 // ─────────────────────────────────────────────
@@ -286,9 +260,6 @@ for (let row = 0; row < ROWS; row++) {
     mesh.userData.brickId = id;
     scene.add(mesh);
 
-    const edges = new THREE.LineSegments(edgeGeo, edgeMat);
-    mesh.add(edges);
-
     bricks[id] = { id, mesh, x, y, fallen: false, animating: false, matType: _mt };
     brickMeshes.push(mesh);
   }
@@ -305,26 +276,33 @@ function fallBrick(brick) {
   const { mesh, x, y } = brick;
   const spin = Math.random() < 0.5 ? 1 : -1;
 
-  gsap.to(mesh.position, {
-    z:        6.8,
-    y:        y - 2.8,
-    x:        x + (Math.random() - 0.5) * 1.8,
-    duration: 0.9,
-    ease:     'power2.in',
-    onComplete() {
-      mesh.visible = false;
-      mesh.position.set(x, y, 0);
-      mesh.rotation.set(0, 0, 0);
-      brick.animating = false;
-    },
-  });
+  const drift = (Math.random() - 0.5) * 0.6;
+
+  // First pop forward just enough to clear the wall plane, then gravity pulls down
+  gsap.timeline()
+    .to(mesh.position, {
+      z: 0.9 + Math.random() * 0.4,
+      duration: 0.12,
+      ease: 'power1.out',
+    })
+    .to(mesh.position, {
+      y: y - 18,
+      x: x + drift,
+      duration: 1.0,
+      ease: 'power2.in',
+      onComplete() {
+        mesh.visible = false;
+        mesh.position.set(x, y, 0);
+        mesh.rotation.set(0, 0, 0);
+        brick.animating = false;
+      },
+    }, 0.08);
 
   gsap.to(mesh.rotation, {
-    x:        spin * Math.PI * (0.35 + Math.random() * 0.5),
-    y:        spin * Math.PI * (0.25 + Math.random() * 0.55),
-    z:              Math.PI * (Math.random() - 0.5) * 0.4,
-    duration: 0.9,
-    ease:     'power2.in',
+    x: spin * Math.PI * (1.2 + Math.random() * 0.8),
+    z: (Math.random() - 0.5) * Math.PI * 0.6,
+    duration: 1.1,
+    ease: 'power2.in',
   });
 }
 
@@ -420,21 +398,9 @@ renderer.domElement.addEventListener('touchend', (e) => {
 // ─────────────────────────────────────────────
 // RENDER LOOP
 // ─────────────────────────────────────────────
-const clock = new THREE.Clock();
-
 (function animate() {
   requestAnimationFrame(animate);
-  const t = clock.getElapsedTime();
-
-  const pulse = 0.5 + 0.5 * Math.sin(t * 1.7);
-  edgeMat.opacity = 0.3 + 0.6 * pulse;
-  edgeMat.color.setRGB(
-    0.05 * pulse,
-    2.2 + 0.6 * pulse,
-    2.8
-  );
-
-  composer.render();
+  renderer.render(scene, camera);
 }());
 
 // ─────────────────────────────────────────────
