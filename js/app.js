@@ -276,33 +276,36 @@ function fallBrick(brick) {
   const { mesh, x, y } = brick;
   const spin = Math.random() < 0.5 ? 1 : -1;
 
-  const drift = (Math.random() - 0.5) * 0.6;
+  const dur = 1.0 + Math.random() * 0.45;
 
-  // First pop forward just enough to clear the wall plane, then gravity pulls down
-  gsap.timeline()
-    .to(mesh.position, {
-      z: 0.9 + Math.random() * 0.4,
-      duration: 0.12,
-      ease: 'power1.out',
-    })
-    .to(mesh.position, {
-      y: y - 18,
-      x: x + drift,
-      duration: 1.0,
-      ease: 'power2.in',
-      onComplete() {
-        mesh.visible = false;
-        mesh.position.set(x, y, 0);
-        mesh.rotation.set(0, 0, 0);
-        brick.animating = false;
-      },
-    }, 0.08);
+  // Horizontal + forward: initial push that bleeds off, like a knocked object
+  gsap.to(mesh.position, {
+    z: 1.1 + Math.random() * 1.2,
+    x: x + (Math.random() - 0.5) * 1.4,
+    duration: dur,
+    ease: 'power1.out',
+  });
 
+  // Vertical: gravity — slow start, accelerates hard
+  gsap.to(mesh.position, {
+    y: y - 22,
+    duration: dur,
+    ease: 'power3.in',
+    onComplete() {
+      mesh.visible = false;
+      mesh.position.set(x, y, 0);
+      mesh.rotation.set(0, 0, 0);
+      brick.animating = false;
+    },
+  });
+
+  // Tumble: constant angular velocity the whole way down (no easing = realistic spin)
   gsap.to(mesh.rotation, {
-    x: spin * Math.PI * (1.2 + Math.random() * 0.8),
-    z: (Math.random() - 0.5) * Math.PI * 0.6,
-    duration: 1.1,
-    ease: 'power2.in',
+    x: spin * Math.PI * (1.8 + Math.random() * 1.4),
+    y: (Math.random() - 0.5) * Math.PI * 1.0,
+    z: (Math.random() - 0.5) * Math.PI * 1.8,
+    duration: dur,
+    ease: 'none',
   });
 }
 
@@ -344,13 +347,14 @@ socket.on('group-fall', ({ brickIds }) => {
   });
 });
 
-socket.on('group-return', ({ brickIds, material }) => {
-  const pool = MAT_POOL[material] || MAT_POOL['brick'];
+socket.on('group-return', ({ brickIds }) => {
+  const newType = MAT_TYPES[Math.floor(Math.random() * MAT_TYPES.length)];
+  const pool = MAT_POOL[newType];
   brickIds.forEach(id => {
     const b = bricks[id];
     if (!b) return;
     b.mesh.material = pool[Math.floor(Math.random() * pool.length)];
-    b.matType = material;
+    b.matType = newType;
     returnBrick(b);
   });
 });
@@ -407,3 +411,109 @@ renderer.domElement.addEventListener('touchend', (e) => {
 // RESIZE — only re-fit CSS, renderer stays 1920×1080
 // ─────────────────────────────────────────────
 window.addEventListener('resize', fitCanvas);
+
+// ─────────────────────────────────────────────
+// DEBUG PANEL
+// ─────────────────────────────────────────────
+const debugPanel  = document.getElementById('debug-panel');
+const debugToggle = document.getElementById('debug-toggle');
+const debugClose  = document.getElementById('debug-close');
+
+debugToggle.addEventListener('click', () => debugPanel.classList.toggle('open'));
+debugClose.addEventListener('click',  () => debugPanel.classList.remove('open'));
+
+// Stats — online count fed from existing socket event
+socket.on('user-count', (n) => {
+  document.getElementById('db-online').textContent = n;
+});
+
+// Latency ping/pong
+function pingLatency() {
+  const t0 = Date.now();
+  socket.emit('latency-ping');
+  socket.once('latency-pong', () => {
+    document.getElementById('db-latency').textContent = `${Date.now() - t0} ms`;
+  });
+}
+pingLatency();
+setInterval(pingLatency, 3000);
+
+// ── Per-material color state { h:0-360, s:0-1, b:0.1-2.5 }
+const matColorState = {};
+MAT_TYPES.forEach(t => { matColorState[t] = { h: 0, s: 0, b: 1 }; });
+let activeMatType = MAT_TYPES[0];
+
+function applyMatColor(type) {
+  const { h, s, b } = matColorState[type];
+  // Lerp white→pure hue by saturation, then scale by brightness
+  const hueCol = new THREE.Color().setHSL(h / 360, 1.0, 0.5);
+  const tint   = new THREE.Color(1, 1, 1).lerp(hueCol, s).multiplyScalar(b);
+  MAT_POOL[type].forEach(mat => mat.color.copy(tint));
+}
+
+const dbHue = document.getElementById('db-hue');
+const dbSat = document.getElementById('db-sat');
+const dbBri = document.getElementById('db-bri');
+
+function syncSlidersToMat(type) {
+  const st = matColorState[type];
+  dbHue.value = st.h;
+  dbSat.value = Math.round(st.s * 100);
+  dbBri.value = Math.round(st.b * 100);
+  document.getElementById('db-hue-val').textContent = `${st.h}°`;
+  document.getElementById('db-sat-val').textContent = `${Math.round(st.s * 100)}%`;
+  document.getElementById('db-bri-val').textContent = `${Math.round(st.b * 100)}%`;
+}
+
+document.querySelectorAll('.mat-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.mat-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeMatType = btn.dataset.mat;
+    syncSlidersToMat(activeMatType);
+  });
+});
+
+dbHue.addEventListener('input', () => {
+  matColorState[activeMatType].h = parseInt(dbHue.value);
+  document.getElementById('db-hue-val').textContent = `${dbHue.value}°`;
+  applyMatColor(activeMatType);
+});
+dbSat.addEventListener('input', () => {
+  matColorState[activeMatType].s = parseInt(dbSat.value) / 100;
+  document.getElementById('db-sat-val').textContent = `${dbSat.value}%`;
+  applyMatColor(activeMatType);
+});
+dbBri.addEventListener('input', () => {
+  matColorState[activeMatType].b = parseInt(dbBri.value) / 100;
+  document.getElementById('db-bri-val').textContent = `${dbBri.value}%`;
+  applyMatColor(activeMatType);
+});
+
+// ── Scale — reshuffle tiling so gaps stay proportional, no clipping
+function reshuffleBricks(s) {
+  const newStepX = STEP_X * s;
+  const newStepY = STEP_Y * s;
+  for (const brick of Object.values(bricks)) {
+    const [col, row] = brick.id.split('_').map(Number);
+    const hexOff = (row % 2) * (newStepX / 2);
+    const newX   = (col - COLS / 2 + 0.5) * newStepX + hexOff;
+    const newY   = (row - ROWS / 2 + 0.5) * newStepY;
+    brick.x = newX;
+    brick.y = newY;
+    brick.mesh.scale.set(s, s, 1);
+    if (!brick.fallen && !brick.animating) {
+      gsap.to(brick.mesh.position, { x: newX, y: newY, duration: 0.35, ease: 'power2.out' });
+    } else {
+      brick.mesh.position.x = newX;
+      brick.mesh.position.y = newY;
+    }
+  }
+}
+
+const dbScale = document.getElementById('db-scale');
+dbScale.addEventListener('input', () => {
+  const s = parseFloat(dbScale.value);
+  document.getElementById('db-scale-val').textContent = s.toFixed(2);
+  reshuffleBricks(s);
+});
