@@ -55,6 +55,130 @@
       70%  { opacity: 0.3; }
       100% { opacity: 0; }
     }
+
+    /* ── Debug toggle button ── */
+    #debug-toggle {
+      position: fixed;
+      top: 16px;
+      left: 20px;
+      z-index: 200;
+      background: rgba(0,0,0,0.55);
+      border: 1px solid rgba(0,220,255,0.25);
+      color: rgba(0,220,255,0.6);
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      padding: 5px 11px;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    #debug-toggle:hover {
+      border-color: rgba(0,220,255,0.6);
+      color: rgba(0,220,255,1);
+    }
+
+    /* ── Debug sidebar ── */
+    #debug-panel {
+      position: fixed;
+      top: 0; right: 0;
+      width: 270px;
+      height: 100vh;
+      z-index: 150;
+      background: rgba(4,4,12,0.92);
+      border-left: 1px solid rgba(0,220,255,0.15);
+      transform: translateX(100%);
+      transition: transform 0.28s cubic-bezier(.4,0,.2,1);
+      display: flex;
+      flex-direction: column;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      color: rgba(0,220,255,0.75);
+      overflow-y: auto;
+    }
+    #debug-panel.open { transform: translateX(0); }
+
+    .db-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px 12px;
+      border-bottom: 1px solid rgba(0,220,255,0.12);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      font-size: 10px;
+    }
+    #debug-close {
+      background: none;
+      border: none;
+      color: rgba(0,220,255,0.5);
+      font-size: 16px;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0 2px;
+    }
+    #debug-close:hover { color: rgba(0,220,255,1); }
+
+    .db-section {
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(0,220,255,0.08);
+    }
+    .db-section-title {
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      font-size: 9px;
+      color: rgba(0,220,255,0.35);
+      margin-bottom: 10px;
+    }
+    .db-stat {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 7px;
+      letter-spacing: 0.1em;
+    }
+    .db-stat-val {
+      color: rgba(0,220,255,1);
+      font-weight: bold;
+    }
+
+    .db-label {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 5px;
+      letter-spacing: 0.1em;
+    }
+    .db-label-val { color: rgba(0,220,255,1); }
+
+    input[type=range] {
+      width: 100%;
+      margin-bottom: 12px;
+      accent-color: rgba(0,220,255,0.8);
+      cursor: pointer;
+    }
+
+    #mat-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-bottom: 13px;
+    }
+    .mat-btn {
+      background: rgba(0,220,255,0.05);
+      border: 1px solid rgba(0,220,255,0.15);
+      color: rgba(0,220,255,0.45);
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 4px 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .mat-btn:hover, .mat-btn.active {
+      background: rgba(0,220,255,0.14);
+      border-color: rgba(0,220,255,0.5);
+      color: rgba(0,220,255,1);
+    }
   </style>
 
   <!-- Three.js module imports -->
@@ -68,9 +192,49 @@
   </script>
 </head>
 <body>
+  <button id="debug-toggle">⬡ debug</button>
+
   <div id="hud">
     <div id="user-count">● 1 online</div>
     <div id="hint">tap a brick</div>
+  </div>
+
+  <div id="debug-panel">
+    <div class="db-header">
+      <span>debug</span>
+      <button id="debug-close">×</button>
+    </div>
+
+    <div class="db-section">
+      <div class="db-section-title">stats</div>
+      <div class="db-stat"><span>online</span><span class="db-stat-val" id="db-online">—</span></div>
+      <div class="db-stat"><span>latency</span><span class="db-stat-val" id="db-latency">—</span></div>
+    </div>
+
+    <div class="db-section">
+      <div class="db-section-title">material color</div>
+      <div id="mat-buttons">
+        <button class="mat-btn active" data-mat="brick">brick</button>
+        <button class="mat-btn" data-mat="wood">wood</button>
+        <button class="mat-btn" data-mat="metal">metal</button>
+        <button class="mat-btn" data-mat="glass">glass</button>
+        <button class="mat-btn" data-mat="concrete">conc</button>
+        <button class="mat-btn" data-mat="asphalt">asph</button>
+        <button class="mat-btn" data-mat="plastic">plst</button>
+      </div>
+      <div class="db-label"><span>hue</span><span class="db-label-val" id="db-hue-val">0°</span></div>
+      <input type="range" id="db-hue" min="0" max="360" value="0">
+      <div class="db-label"><span>saturation</span><span class="db-label-val" id="db-sat-val">0%</span></div>
+      <input type="range" id="db-sat" min="0" max="100" value="0">
+      <div class="db-label"><span>brightness</span><span class="db-label-val" id="db-bri-val">100%</span></div>
+      <input type="range" id="db-bri" min="10" max="250" value="100">
+    </div>
+
+    <div class="db-section">
+      <div class="db-section-title">bricks</div>
+      <div class="db-label"><span>scale</span><span class="db-label-val" id="db-scale-val">1.00</span></div>
+      <input type="range" id="db-scale" min="0.3" max="1.8" step="0.01" value="1">
+    </div>
   </div>
 
   <!-- Socket.IO (served by Express) -->

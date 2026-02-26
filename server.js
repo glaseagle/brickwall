@@ -85,6 +85,8 @@ io.on('connection', (socket) => {
     io.emit('group-fall', { groupId, brickIds: groupIds });
   });
 
+  socket.on('latency-ping', () => socket.emit('latency-pong'));
+
   socket.on('disconnect', () => {
     userCount = Math.max(0, userCount - 1);
     console.log(`[-] ${socket.id} disconnected (${userCount} online)`);
