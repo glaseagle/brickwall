@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Brick Wall</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #fff;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      touch-action: none;
+    }
+
+    canvas { display: block; }
+
+    #user-count {
+      position: fixed;
+      bottom: 20px;
+      right: 16px;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      color: #bbb;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="wall"></canvas>
+  <div id="user-count">● 1 online</div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/mobile/app.js"></script>
+</body>
+</html>

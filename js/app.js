@@ -12,6 +12,12 @@ socket.on('user-count', (n) => {
   document.getElementById('user-count').textContent = `● ${n} online`;
 });
 
+const lockedBricks = new Set();
+socket.on('perimeter-update', ({ lockedBrickIds }) => {
+  lockedBricks.clear();
+  lockedBrickIds.forEach(id => lockedBricks.add(id));
+});
+
 // ─────────────────────────────────────────────
 // RENDERER — fixed 1920×1080, CSS-scaled to fit
 // ─────────────────────────────────────────────
@@ -61,7 +67,6 @@ scene.add(rim);
 // ─────────────────────────────────────────────
 // WALL CONFIGURATION
 // ─────────────────────────────────────────────
-const COLS   = 20;
 const BW     = 0.82;
 const BH     = 0.28;
 const BD     = 0.24;
@@ -70,9 +75,10 @@ const GY     = 0.038;
 const STEP_X = BW + GX;
 const STEP_Y = BH + GY;
 
-// Compute rows needed to fill the visible frustum height
+// Compute rows and cols needed to fill a square area (height × height)
 const _visH   = 2 * Math.tan(THREE.MathUtils.degToRad(55) / 2) * 7;
 const ROWS    = Math.ceil(_visH / STEP_Y) + 1; // +1 for margin
+const COLS    = Math.ceil(_visH / STEP_X) + 1; // square: use height for width too
 
 // Drop camera to the bottom row's Y, angle it up to wall centre
 const bottom_y = (0.5 - ROWS / 2) * STEP_Y;
@@ -242,6 +248,9 @@ MAT_TYPES.forEach((type, ti) => {
 // ─────────────────────────────────────────────
 // BUILD BRICK GRID
 // ─────────────────────────────────────────────
+const brickGroup  = new THREE.Group();
+scene.add(brickGroup);
+
 const bricks      = {};
 const brickMeshes = [];
 
@@ -258,7 +267,7 @@ for (let row = 0; row < ROWS; row++) {
     const mesh  = new THREE.Mesh(brickGeo, _pool[Math.floor(Math.random() * _pool.length)]);
     mesh.position.set(x, y, 0);
     mesh.userData.brickId = id;
-    scene.add(mesh);
+    brickGroup.add(mesh);
 
     bricks[id] = { id, mesh, x, y, fallen: false, animating: false, matType: _mt };
     brickMeshes.push(mesh);
@@ -382,7 +391,7 @@ function onInteract(clientX, clientY) {
     const id    = hit.object.userData.brickId;
     const brick = bricks[id];
     console.log('[hit]', id, { fallen: brick?.fallen, animating: brick?.animating });
-    if (brick && !brick.fallen && !brick.animating) {
+    if (brick && !brick.fallen && !brick.animating && !lockedBricks.has(id)) {
       socket.emit('brick-click', { brickId: id, material: brick.matType });
       console.log('[emit] brick-click', id, brick.matType);
     }
@@ -516,4 +525,12 @@ dbScale.addEventListener('input', () => {
   const s = parseFloat(dbScale.value);
   document.getElementById('db-scale-val').textContent = s.toFixed(2);
   reshuffleBricks(s);
+});
+
+// ── X-offset — slide brick group left/right
+const dbXoff = document.getElementById('db-xoff');
+dbXoff.addEventListener('input', () => {
+  const v = parseFloat(dbXoff.value);
+  document.getElementById('db-xoff-val').textContent = v.toFixed(2);
+  brickGroup.position.x = v;
 });
