@@ -7,6 +7,15 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+const isMobile = (ua = '') =>
+  /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(ua);
+
+app.get('/', (req, res) => {
+  const ua   = req.headers['user-agent'] || '';
+  const file = isMobile(ua) ? 'mobile.html' : 'index.html';
+  res.sendFile(path.join(__dirname, 'public', file));
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/video/giant', (req, res) => {
@@ -14,11 +23,13 @@ app.get('/video/giant', (req, res) => {
 });
 
 // Grid dimensions must match client
-const COLS     = 20;
+const COLS     = 10;
 const ROWS_MAX = 30;
 
 // brickId -> { fallen: bool, timer: Timeout | null }
 const brickState = {};
+// set of brick IDs on the perimeter of current holes (locked from falling)
+const lockedBricks = new Set();
 let userCount    = 0;
 let groupCounter = 0;
 
@@ -49,21 +60,39 @@ function getNeighborIds(col, row) {
     .map(([c, r]) => `${c}_${r}`);
 }
 
+// Recompute the full perimeter: every unfallen brick adjacent to any fallen brick.
+function recomputePerimeter() {
+  lockedBricks.clear();
+  for (const [id, state] of Object.entries(brickState)) {
+    if (!state.fallen) continue;
+    const [col, row] = id.split('_').map(Number);
+    for (const nId of getNeighborIds(col, row)) {
+      if (!brickState[nId]?.fallen) {
+        lockedBricks.add(nId);
+      }
+    }
+  }
+}
+
 io.on('connection', (socket) => {
   userCount++;
   console.log(`[+] ${socket.id} connected  (${userCount} online)`);
   io.emit('user-count', userCount);
 
   socket.emit('init-state', getSnapshot());
+  socket.emit('perimeter-update', { lockedBrickIds: Array.from(lockedBricks) });
 
   socket.on('brick-click', ({ brickId, material } = {}) => {
     if (typeof brickId !== 'string') return;
     if (brickState[brickId]?.fallen) return;
+    if (lockedBricks.has(brickId)) return;  // perimeter-locked
 
     const [col, row] = brickId.split('_').map(Number);
 
-    // Collect available (non-fallen) neighbours
-    const available = getNeighborIds(col, row).filter(id => !brickState[id]?.fallen);
+    // Collect available (non-fallen, non-locked) neighbours
+    const available = getNeighborIds(col, row).filter(id =>
+      !brickState[id]?.fallen && !lockedBricks.has(id)
+    );
 
     // Pick 3–6 of them at random
     const shuffled   = available.sort(() => Math.random() - 0.5);
@@ -78,11 +107,15 @@ io.on('connection', (socket) => {
         if (brickState[id]) { brickState[id].fallen = false; brickState[id].timer = null; }
       });
       io.emit('group-return', { brickIds: groupIds, material: returnMat });
+      recomputePerimeter();
+      io.emit('perimeter-update', { lockedBrickIds: Array.from(lockedBricks) });
     }, delay);
 
     groupIds.forEach(id => { brickState[id] = { fallen: true, timer }; });
 
     io.emit('group-fall', { groupId, brickIds: groupIds });
+    recomputePerimeter();
+    io.emit('perimeter-update', { lockedBrickIds: Array.from(lockedBricks) });
   });
 
   socket.on('latency-ping', () => socket.emit('latency-pong'));
@@ -94,7 +127,7 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`\nBrick Wall running → http://localhost:${PORT}`);
   console.log('Other devices on your network can connect via your local IP.\n');
