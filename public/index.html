@@ -212,6 +212,41 @@
     </div>
 
     <div class="db-section">
+      <div class="db-section-title">scale preview</div>
+      <label class="db-label" style="cursor:pointer">
+        <span>enabled</span>
+        <input type="checkbox" id="db-accent" style="accent-color:rgba(0,220,255,0.8)">
+      </label>
+      <div id="accent-mat-buttons" style="margin-top:8px">
+        <button class="mat-btn active" data-accent-mat="brick">brick</button>
+        <button class="mat-btn" data-accent-mat="wood">wood</button>
+        <button class="mat-btn" data-accent-mat="metal">metal</button>
+        <button class="mat-btn" data-accent-mat="glass">glass</button>
+        <button class="mat-btn" data-accent-mat="concrete">conc</button>
+        <button class="mat-btn" data-accent-mat="asphalt">asph</button>
+        <button class="mat-btn" data-accent-mat="plastic">plst</button>
+      </div>
+    </div>
+
+    <div class="db-section">
+      <div class="db-section-title">background</div>
+      <label class="db-label" style="cursor:pointer">
+        <span>disable video</span>
+        <input type="checkbox" id="db-novideo" style="accent-color:rgba(0,220,255,0.8)">
+      </label>
+      <div class="db-label"><span>white value</span><span class="db-label-val" id="db-bgval-val">0%</span></div>
+      <input type="range" id="db-bgval" min="0" max="100" value="0">
+    </div>
+
+    <div class="db-section">
+      <div class="db-section-title">global</div>
+      <div class="db-label"><span>all materials</span><span class="db-label-val" id="db-gbri-val">100%</span></div>
+      <input type="range" id="db-gbri" min="10" max="250" value="100">
+      <div class="db-label"><span>screen</span><span class="db-label-val" id="db-screen-val">110%</span></div>
+      <input type="range" id="db-screen" min="10" max="300" value="110">
+    </div>
+
+    <div class="db-section">
       <div class="db-section-title">material color</div>
       <div id="mat-buttons">
         <button class="mat-btn active" data-mat="brick">brick</button>
@@ -234,6 +269,10 @@
       <div class="db-section-title">bricks</div>
       <div class="db-label"><span>scale</span><span class="db-label-val" id="db-scale-val">1.00</span></div>
       <input type="range" id="db-scale" min="0.3" max="1.8" step="0.01" value="1">
+      <div class="db-label"><span>gap</span><span class="db-label-val" id="db-gap-val">0.038</span></div>
+      <input type="range" id="db-gap" min="0" max="0.4" step="0.001" value="0.038">
+      <div class="db-label"><span>rotation</span><span class="db-label-val" id="db-rot-val">0°</span></div>
+      <input type="range" id="db-rot" min="-45" max="45" step="0.5" value="0">
       <div class="db-label"><span>x offset</span><span class="db-label-val" id="db-xoff-val">0.00</span></div>
       <input type="range" id="db-xoff" min="-6" max="6" step="0.01" value="0">
     </div>
