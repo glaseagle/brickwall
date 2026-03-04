@@ -447,6 +447,9 @@ function pingLatency() {
 pingLatency();
 setInterval(pingLatency, 3000);
 
+// ── Global color state (applied on top of per-material)
+const globalColorState = { b: 1 };
+
 // ── Per-material color state { h:0-360, s:0-1, b:0.1-2.5 }
 const matColorState = {};
 MAT_TYPES.forEach(t => { matColorState[t] = { h: 0, s: 0, b: 1 }; });
@@ -454,10 +457,15 @@ let activeMatType = MAT_TYPES[0];
 
 function applyMatColor(type) {
   const { h, s, b } = matColorState[type];
+  const totalB = b * globalColorState.b;
   // Lerp white→pure hue by saturation, then scale by brightness
   const hueCol = new THREE.Color().setHSL(h / 360, 1.0, 0.5);
-  const tint   = new THREE.Color(1, 1, 1).lerp(hueCol, s).multiplyScalar(b);
+  const tint   = new THREE.Color(1, 1, 1).lerp(hueCol, s).multiplyScalar(totalB);
   MAT_POOL[type].forEach(mat => mat.color.copy(tint));
+}
+
+function applyAllMats() {
+  MAT_TYPES.forEach(t => applyMatColor(t));
 }
 
 const dbHue = document.getElementById('db-hue');
@@ -499,10 +507,14 @@ dbBri.addEventListener('input', () => {
   applyMatColor(activeMatType);
 });
 
-// ── Scale — reshuffle tiling so gaps stay proportional, no clipping
-function reshuffleBricks(s) {
-  const newStepX = STEP_X * s;
-  const newStepY = STEP_Y * s;
+// ── Reposition all bricks using current scale + gap
+let currentScale = 1.0;
+let currentGap   = GX; // world-unit gap between bricks
+
+function repositionBricks() {
+  const s        = currentScale;
+  const newStepX = BW * s + currentGap;
+  const newStepY = BH * s + currentGap;
   for (const brick of Object.values(bricks)) {
     const [col, row] = brick.id.split('_').map(Number);
     const hexOff = (row % 2) * (newStepX / 2);
@@ -522,9 +534,106 @@ function reshuffleBricks(s) {
 
 const dbScale = document.getElementById('db-scale');
 dbScale.addEventListener('input', () => {
-  const s = parseFloat(dbScale.value);
-  document.getElementById('db-scale-val').textContent = s.toFixed(2);
-  reshuffleBricks(s);
+  currentScale = parseFloat(dbScale.value);
+  document.getElementById('db-scale-val').textContent = currentScale.toFixed(2);
+  repositionBricks();
+});
+
+const dbGap = document.getElementById('db-gap');
+dbGap.addEventListener('input', () => {
+  currentGap = parseFloat(dbGap.value);
+  document.getElementById('db-gap-val').textContent = currentGap.toFixed(3);
+  repositionBricks();
+});
+
+const dbRot = document.getElementById('db-rot');
+dbRot.addEventListener('input', () => {
+  const deg = parseFloat(dbRot.value);
+  document.getElementById('db-rot-val').textContent = `${deg}°`;
+  brickGroup.rotation.x = deg * Math.PI / 180;
+});
+
+// ── Background: video toggle + white value
+const bgColor = new THREE.Color(0, 0, 0);
+
+document.getElementById('db-novideo').addEventListener('change', (e) => {
+  scene.background = e.target.checked ? bgColor : videoTex;
+});
+
+const dbBgval = document.getElementById('db-bgval');
+dbBgval.addEventListener('input', () => {
+  const v = parseInt(dbBgval.value) / 100;
+  bgColor.setScalar(v);
+  document.getElementById('db-bgval-val').textContent = `${dbBgval.value}%`;
+});
+
+// ── Global: all-materials brightness + screen brightness
+const dbGbri   = document.getElementById('db-gbri');
+const dbScreen = document.getElementById('db-screen');
+
+dbGbri.addEventListener('input', () => {
+  globalColorState.b = parseInt(dbGbri.value) / 100;
+  document.getElementById('db-gbri-val').textContent = `${dbGbri.value}%`;
+  applyAllMats();
+});
+
+dbScreen.addEventListener('input', () => {
+  renderer.domElement.style.filter = `brightness(${parseInt(dbScreen.value) / 100})`;
+  document.getElementById('db-screen-val').textContent = `${dbScreen.value}%`;
+});
+
+// ── Scale preview — vertical column, one brick per scale step (largest→smallest)
+const N_SCALE_STEPS = 10;
+const SCALE_COL_MIN = 0.3;
+const SCALE_COL_MAX = 1.8;
+
+const scaleGroup = new THREE.Group();
+scene.add(scaleGroup);
+scaleGroup.visible = false;
+
+let scaleColMeshes = [];
+let scalePreviewEnabled = false;
+let scalePreviewMat = 'brick';
+
+function buildScaleColumn() {
+  scaleColMeshes.forEach(m => scaleGroup.remove(m));
+  scaleColMeshes = [];
+
+  const spacing = _visH / N_SCALE_STEPS;
+  const pool    = MAT_POOL[scalePreviewMat];
+
+  for (let i = 0; i < N_SCALE_STEPS; i++) {
+    const t     = i / (N_SCALE_STEPS - 1);                    // 0 = top, 1 = bottom
+    const scale = SCALE_COL_MAX - t * (SCALE_COL_MAX - SCALE_COL_MIN);
+    const y     = (_visH / 2) - (i + 0.5) * spacing;
+
+    const mesh = new THREE.Mesh(brickGeo, pool[Math.floor(Math.random() * pool.length)]);
+    mesh.scale.set(scale, scale, 1);
+    mesh.position.set(0, y, 0);
+    scaleGroup.add(mesh);
+    scaleColMeshes.push(mesh);
+  }
+}
+
+document.getElementById('db-accent').addEventListener('change', (e) => {
+  scalePreviewEnabled = e.target.checked;
+  if (scalePreviewEnabled) {
+    brickGroup.visible = false;
+    buildScaleColumn();
+    scaleGroup.visible = true;
+  } else {
+    scaleGroup.visible = false;
+    brickGroup.visible = true;
+  }
+});
+
+document.querySelectorAll('[data-accent-mat]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-accent-mat]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    scalePreviewMat = btn.dataset.accentMat;
+    if (scalePreviewEnabled) buildScaleColumn();
+  });
 });
 
 // ── X-offset — slide brick group left/right
