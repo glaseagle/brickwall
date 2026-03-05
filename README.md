@@ -1,5 +1,7 @@
 # Brick Wall
 
+**Live:** https://glaseagle.github.io/brickwall
+
 A real-time collaborative interactive brick wall. Click any brick and it tumbles toward you in 3D, revealing warm light from behind the wall. All connected users see every interaction live.
 
 Built with Node.js, Socket.IO, and Three.js.
